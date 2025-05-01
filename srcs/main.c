@@ -4,7 +4,6 @@ static void init_data(t_data *data, char **envp)
 {
     init_env(data, envp);
     data->cmd = NULL;
-    data->envp = NULL;
     data->exit_status = 0;
     data->pid = 0;
     data->is_child = false;

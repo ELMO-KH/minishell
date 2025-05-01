@@ -46,8 +46,8 @@ typedef struct s_token
 typedef struct s_cmd
 {
     char            **args;
-    char            *in_fd;
-    char             *out_fd;
+    int            in_fd;
+    int             out_fd;
     bool            is_append;
     bool            is_heredoc;
     struct s_cmd    *next;
@@ -57,7 +57,6 @@ typedef struct s_data
 {
     t_env       *env;
     t_cmd       *cmd;
-    char        **envp;
     int         exit_status;
     pid_t       pid;
     bool        is_child;
@@ -68,7 +67,7 @@ int     ft_cd(t_data *data, char **args);
 int     ft_echo(t_data *data, char **args);
 int     ft_exit(t_data *data, char **args);
 int     ft_pwd(t_data *data);
-int ft_env(t_data *data, char **args);
+int     ft_env(t_data *data, char **args);
 int     ft_export(t_data *data, char **args);
 int     ft_unset(t_data *data, char **args);
 
@@ -78,16 +77,14 @@ int     execute_builtin(t_data *data);
 void    execute_external(t_data *data);
 
 /* Environment */
-void    init_env(t_data *data, char **envp);
-char    *get_env_value(t_env *env, const char *key);
-t_env   *new_env_node(const char *key, const char *value);
-void    add_env_node(t_env **env_list, char *key, char *value);
-void    add_back_env(t_env **env, t_env *new);
-char    *get_env_value(t_env *env, const char *key);
-void update_env(t_env *env, const char *key, const char *value);
-t_env *new_env_node(const char *key, const char *value);
-t_env *new_env_node(const char *key, const char *value);
+void init_env(t_data *data, char **envp);
+void update_env(t_env *env, const char *key, const char *new_value);
+void add_env_node(t_env **env, t_env *new_node);
+char *extract_key(char *str);
+char *extract_value(char *str);
 char *get_env_value(t_env *env, const char *key);
+t_env *new_env_node(char *key, char *value);
+void sort_and_print_env(t_env *env);
 
 /* Parsing */
 t_cmd   *parse_line(char *line);

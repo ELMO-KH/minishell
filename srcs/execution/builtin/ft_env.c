@@ -19,8 +19,12 @@ int ft_env(t_data *data, char **args)
             ft_putstr_fd(env->key, STDOUT_FILENO);
             ft_putchar_fd('=', STDOUT_FILENO);
             ft_putstr_fd(env->value, STDOUT_FILENO);
-            ft_putchar_fd('\n', STDOUT_FILENO);
         }
+        else
+        {
+            ft_putstr_fd(env->key, STDOUT_FILENO);
+        }
+        ft_putchar_fd('\n', STDOUT_FILENO);
         env = env->next;
     }
     data->exit_status = SUCCESS;

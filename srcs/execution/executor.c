@@ -24,7 +24,8 @@ int execute_builtin(t_data *data)
         return ft_pwd(data);
     if (!ft_strcmp(cmd, "env"))
         return ft_env(data, data->cmd->args);
-
+    if (!ft_strcmp(cmd, "export"))
+        return ft_export(data, data->cmd->args);
     return 0;
 }
 
