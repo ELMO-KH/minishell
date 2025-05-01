@@ -14,4 +14,5 @@ void    ft_unset(t_data *data, char **args)
         return ;
     }    
     i = 1;
+    lkjgalkjg
 }
