@@ -26,6 +26,8 @@ int execute_builtin(t_data *data)
         return ft_env(data, data->cmd->args);
     if (!ft_strcmp(cmd, "export"))
         return ft_export(data, data->cmd->args);
+    if (!ft_strcmp(cmd, "unset"))
+    return ft_unset(data, data->cmd->args);
     return 0;
 }
 
