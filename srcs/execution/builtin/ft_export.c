@@ -1,76 +1,100 @@
-#include "minishell.h"
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   ft_export.c                                        :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: elkharti <elkharti@student.1337.ma>        +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/04/15 10:00:00 by elkharti          #+#    #+#             */
+/*   Updated: 2025/07/11 19:47:17 by elkharti         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
 
-bool	is_valid_key(const char *key)
+#include "../../../includes/minishell.h"
+
+bool	is_valid_key(const char *arg)
 {
 	int	i;
 
-	if (!key || !key[0])
+	if (!arg || !arg[0])
 		return (false);
-	if (!ft_isalpha(key[0]) && key[0] != '_')
+	if (!ft_isalpha(arg[0]) && arg[0] != '_')
 		return (false);
 	i = 1;
-	while (key[i])
+	while (arg[i] && arg[i] != '=')
 	{
-		if (!ft_isalnum(key[i]) && key[i] != '_')
+		if ((arg[i + 1] == '\0' && (arg[i] == '-' || arg[i] == '-'))
+			|| (arg[i - 1] == '\0' && (arg[i] == '-' || arg[i] == '-')))
+			return (false);
+		if (!ft_isalnum(arg[i]) && arg[i] != '_')
 			return (false);
 		i++;
 	}
+	if (arg[i] == '=' && arg[i - 1] == '-')
+		return (false);
 	return (true);
 }
 
-static void	print_invalid(char *arg)
+static char	*extract_key_until_equal(char *arg)
 {
-	ft_putstr_fd("minishell: export: `", STDERR_FILENO);
-	ft_putstr_fd(arg, STDERR_FILENO);
-	ft_putstr_fd("': not a valid identifier\n", STDERR_FILENO);
+	int		i;
+	char	*key;
+
+	i = 0;
+	while (arg[i] && arg[i] != '=')
+		i++;
+	key = ft_substr(arg, 0, i);
+	return (key);
 }
 
-static void	update_or_add_env(t_data *data, char *key, char *val)
+static int	process_export_arg(t_data *data, char *arg)
 {
-	t_env	*env;
+	char	*key;
+	char	*val_part;
+	char	*value;
 
-	env = data->env;
-	while (env)
+	if (!is_valid_key(arg))
 	{
-		if (ft_strcmp(env->key, key) == 0)
-		{
-			free(env->value);
-			env->value = ft_strdup(val);
-			return ;
-		}
-		env = env->next;
+		ft_putstr_fd("minishell: export: `", STDERR_FILENO);
+		ft_putstr_fd(arg, STDERR_FILENO);
+		ft_putstr_fd("': not a valid identifier\n", STDERR_FILENO);
+		return ((g_exit_status = 1), FAILURE);
 	}
-	add_env_node(&data->env, new_env_node(key, val));
+	key = extract_key_until_equal(arg);
+	if (!key)
+		return (FAILURE);
+	val_part = ft_strchr(arg, '=');
+	if (val_part)
+	{
+		value = ft_strdup(val_part + 1);
+		if (!value)
+			return (FAILURE);
+		update_or_add_env(&data->env, key, value);
+	}
+	else
+		update_or_add_env(&data->env, key, NULL);
+	return (SUCCESS);
 }
 
 int	ft_export(t_data *data, char **args)
 {
-	char	*key;
-	char	*val;
-	int		i;
+	int	i;
+	int	exit_status;
 
 	if (!args[1])
-		return (sort_and_print_env(data->env), SUCCESS);
+	{
+		sort_and_print_env(data->env);
+		g_exit_status = SUCCESS;
+		return (SUCCESS);
+	}
 	i = 1;
+	exit_status = SUCCESS;
 	while (args[i])
 	{
-		key = extract_key(args[i]);
-		if (!is_valid_key(key))
-		{
-			print_invalid(args[i]);
-			free(key);
-		}
-		else if (ft_strchr(args[i], '='))
-		{
-			val = extract_value(args[i]);
-			update_or_add_env(data, key, val);
-			free(val);
-			free(key);
-		}
-		else
-			free(key);
+		if (process_export_arg(data, args[i]) == FAILURE)
+			exit_status = FAILURE;
 		i++;
 	}
-	data->exit_status = SUCCESS;
-	return (SUCCESS);
+	g_exit_status = exit_status;
+	return (exit_status);
 }

@@ -1,101 +1,102 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   executor.c                                         :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: elkharti <elkharti@student.1337.ma>        +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/04/15 10:00:00 by elkharti          #+#    #+#             */
+/*   Updated: 2025/07/12 18:09:35 by elkharti         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "../../includes/minishell.h"
 
-int is_builtin(char *cmd)
+static void	execute_external_child(t_data *data, char *path)
 {
-    if (!cmd)
-        return 0;
-    return (!ft_strcmp(cmd, "cd") || !ft_strcmp(cmd, "echo") ||
-            !ft_strcmp(cmd, "exit") || !ft_strcmp(cmd, "pwd") ||
-            !ft_strcmp(cmd, "env") || !ft_strcmp(cmd, "export") ||
-            !ft_strcmp(cmd, "unset"));
+	char			**envp;
+	t_command		*cmd;
+	struct stat		file_info;
+
+	cmd = data->cmd;
+	if (setup_redirections(data->cmd) < 0)
+		exit(1);
+	envp = env_to_array(data->env);
+	execve(path, data->cmd->args, envp);
+	if (!cmd || !cmd->args || !cmd->args[0])
+		return ;
+	if (stat(cmd->args[0], &file_info) == -1)
+		return ;
+	if (S_ISDIR(file_info.st_mode))
+	{
+		ft_putstr_fd("minishell: ", STDERR_FILENO);
+		ft_putstr_fd(cmd->args[0], STDERR_FILENO);
+		ft_putstr_fd(": Is a directory\n", STDERR_FILENO);
+		exit(126);
+	}
+	perror("minishell");
+	exit(126);
 }
 
-int execute_builtin(t_data *data)
+static void	handle_signal_status(int status)
 {
-    char *cmd = data->cmd->args[0];
-
-    if (!ft_strcmp(cmd, "cd"))
-        return ft_cd(data, data->cmd->args);
-    if (!ft_strcmp(cmd, "echo"))
-        return ft_echo(data, data->cmd->args);
-    if (!ft_strcmp(cmd, "exit"))
-        return ft_exit(data, data->cmd->args);
-    if (!ft_strcmp(cmd, "pwd"))
-        return ft_pwd(data);
-    if (!ft_strcmp(cmd, "env"))
-        return ft_env(data, data->cmd->args);
-    if (!ft_strcmp(cmd, "export"))
-        return ft_export(data, data->cmd->args);
-    if (!ft_strcmp(cmd, "unset"))
-        return ft_unset(data, data->cmd->args);
-    return 0;
+	if (WIFEXITED(status))
+		g_exit_status = WEXITSTATUS(status);
+	else if (WIFSIGNALED(status))
+		g_exit_status = 128 + WTERMSIG(status);
+	if (g_exit_status == 130)
+		printf("\n");
+	if (g_exit_status == 131)
+		printf("Quit (core dumped)\n");
 }
 
-int external_command(t_data *data)
+int	launch_external_command(t_data *data)
 {
-    pid_t pid_ch;
-    char *path;
+	char	*path;
+	pid_t	pid;
+	int		status;
 
-    if (access(data->cmd->args[0], X_OK) == 0)
-        path = ft_strdup(data->cmd->args[0]);
-    else
-        path = get_path(data, data->cmd->args[0]);
-
-    if (!path)
-    {
-        fprintf(stderr, "minishell: %s: command not found\n", data->cmd->args[0]);
-        return 127;
-    }
-
-    pid_ch = fork();
-    if (pid_ch == -1)
-        return (perror("fork"), 1);
-
-    if (pid_ch == 0)
-    {
-        setup_redirections(data->cmd);
-        char **envp = env_to_array(data->env);
-        if (execve(path, data->cmd->args, envp) == -1)
-        {
-            perror("execve");
-            exit(1);
-        }
-    }
-    else
-        waitpid(pid_ch, &data->exit_status, 0);
-
-    free(path);
-    return WEXITSTATUS(data->exit_status);
+	if (!data->cmd->args || !data->cmd->args[0])
+		return ((g_exit_status = 0), 0);
+	path = get_command_path(data);
+	if (!path)
+	{
+		g_exit_status = handle_cmd_not_found(data);
+		return (g_exit_status);
+	}
+	pid = fork();
+	if (pid == -1)
+		return ((perror("minishell: fork"), 1));
+	if (pid == 0)
+	{
+		signal_child_handler();
+		execute_external_child(data, path);
+	}
+	signal(SIGINT, SIG_IGN);
+	waitpid(pid, &status, 0);
+	signal_parent_handler();
+	handle_signal_status(status);
+	return (g_exit_status);
 }
 
-void executer(t_data *data, char **envp)
+int	executer(t_data *data)
 {
-    (void)envp;
+	int	saved_in;
+	int	saved_out;
 
-    if (!data->cmd)
-        return;
-    if (!data->cmd->args || !data->cmd->args[0])
-    {
-        setup_redirections(data->cmd);
-        return;
-    }
-    if (is_builtin(data->cmd->args[0]) && !data->cmd->next)
-    {
-        int stdin_copy = dup(STDIN_FILENO);
-        int stdout_copy = dup(STDOUT_FILENO);
-        setup_redirections(data->cmd);
-        data->exit_status = execute_builtin(data);
-        dup2(stdin_copy, STDIN_FILENO);
-        dup2(stdout_copy, STDOUT_FILENO);
-        close(stdin_copy);
-        close(stdout_copy);
-        return;
-    }
-    if (!data->cmd->next)
-    {
-        data->exit_status = external_command(data);
-        return;
-    }
-    execute_pipe(data);
+	if (!data->cmd)
+		return (FAILURE);
+	if (!data->cmd->args || !data->cmd->args[0])
+	{
+		if (save_std_fd(&saved_in, &saved_out) < 0)
+			return (FAILURE);
+		if (setup_redirections(data->cmd) < 0)
+			return (FAILURE);
+		reset_std_fd(saved_in, saved_out);
+		return (SUCCESS);
+	}
+	if (!data->cmd->next)
+		return (g_exit_status = handle_single_cmd(data));
+	execute_pipe(data);
+	return (g_exit_status);
 }
-

@@ -1,89 +1,126 @@
-#include "minishell.h"
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   pipes.c                                            :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: elkharti <elkharti@student.1337.ma>        +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/04/15 10:00:00 by elkharti          #+#    #+#             */
+/*   Updated: 2025/07/11 09:04:06 by elkharti         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
 
-static pid_t	create_pipe_and_fork(t_command *cmd, int *fd)
+#include "../../includes/minishell.h"
+
+static pid_t	create_pipe_and_fork(int *fd, t_command *cmd)
 {
+	pid_t	pid;
+
 	if (cmd->next && pipe(fd) == -1)
 	{
 		perror("minishell: pipe");
 		exit(EXIT_FAILURE);
 	}
-	pid_t pid = fork();
+	pid = fork();
 	if (pid == -1)
 	{
+		signal_child_handler();
 		perror("minishell: fork");
 		exit(EXIT_FAILURE);
 	}
 	return (pid);
 }
 
-static void	child_exec(t_data *data, t_command *cmd, int pre_fd, int *fd)
+static void	setup_child_io(int pre_fd, int *fd, t_command *cmd)
 {
-	char *path;
-
 	if (pre_fd != -1)
 	{
 		dup2(pre_fd, STDIN_FILENO);
-		close(pre_fd);
+		safe_close(pre_fd);
 	}
 	if (cmd->next)
 	{
-		close(fd[0]);
+		safe_close(fd[0]);
 		dup2(fd[1], STDOUT_FILENO);
-		close(fd[1]);
+		safe_close(fd[1]);
 	}
-	setup_redirections(cmd);
+}
+
+static void	exec_ch_process(t_data *data, t_command *cmd)
+{
+	char	*path;
+	char	**envp;
+
+	if (setup_redirections(cmd) < 0)
+		exit(1);
+	if (cmd->args && is_builtin(cmd->args[0]))
+	{
+		execute_builtin(data, cmd);
+		exit(g_exit_status);
+	}
+	if (!cmd->args || !cmd->args[0])
+		exit(0);
 	path = get_path(data, cmd->args[0]);
 	if (!path)
 	{
-		ft_putstr_fd("minishell: ", 2);
-		ft_putstr_fd(cmd->args[0], 2);
-		ft_putendl_fd(": command not found", 2);
+		ft_putstr_fd("minishell: ", STDERR_FILENO);
+		ft_putstr_fd(cmd->args[0], STDERR_FILENO);
+		ft_putstr_fd(": command not found", STDERR_FILENO);
+		ft_putstr_fd("\n", STDERR_FILENO);
 		exit(127);
 	}
-	execve(path, cmd->args, env_to_array(data->env));
+	envp = env_to_array(data->env);
+	execve(path, cmd->args, envp);
 	perror("minishell: execve");
 	exit(126);
 }
 
-static void	update_parent_state(t_data *data)
+static void	wait_for_children(t_pipe *p, t_data *data)
 {
-	t_pipe *p = data->pipe;
+	int	j;
+	int	status;
 
-	p->pids[p->i++] = p->pid;
-	if (p->pre_fd != -1)
-		close(p->pre_fd);
-	if (p->current->next)
+	(void)data;
+	j = 0;
+	while (j < p->i)
 	{
-		close(p->fd[1]);
-		p->pre_fd = p->fd[0];
+		waitpid(p->pids[j], &status, 0);
+		if (j == p->i - 1)
+		{
+			if (WIFSIGNALED(status))
+				g_exit_status = 128 + WTERMSIG(status);
+			else if (WIFEXITED(status))
+				g_exit_status = WEXITSTATUS(status);
+		}
+		j++;
 	}
-	p->current = p->current->next;
 }
 
 void	execute_pipe(t_data *data)
 {
-	t_pipe  *p;
-    int     j;
-    int     status;
-    
-    p = data->pipe;
-	p->pre_fd = -1;
-	p->i = 0;
-	p->current = data->cmd;
-	while (p->current)
+	t_pipe	p;
+
+	p.pre_fd = -1;
+	p.i = 0;
+	p.cur = data->cmd;
+	while (p.cur)
 	{
-		p->pid = create_pipe_and_fork(p->current, p->fd);
-		if (p->pid == 0)
-			child_exec(data, p->current, p->pre_fd, p->fd);
+		p.pid = create_pipe_and_fork(p.fd, p.cur);
+		p.pids[p.i] = p.pid;
+		p.i++;
+		if (p.pid == 0)
+		{
+			signal_child_handler();
+			setup_child_io(p.pre_fd, p.fd, p.cur);
+			exec_ch_process(data, p.cur);
+		}
 		else
-			update_parent_state(data);
+		{
+			parent_cleanup(&p.pre_fd, p.fd, &p.cur);
+			p.cur = p.cur->next;
+		}
 	}
-    j = 0;
-	while (j < data->pipe->i)
-	{
-		waitpid(data->pipe->pids[j], &status, 0);
-		if (WIFEXITED(status) && j == data->pipe->i - 1)
-			data->exit_status = WEXITSTATUS(status);
-		j++;
-	}
+	signal(SIGINT, SIG_IGN);
+	wait_for_children(&p, data);
+	signal_parent_handler();
 }

@@ -1,51 +1,62 @@
-NAME    = minishell
+NAME = minishell
 
-CC      = cc
-CFLAGS  = -Wall -Wextra -Werror -g
+CC = cc
+CFLAGS = -Wall -Wextra -Werror
 
-SRC_DIR = srcs
-OBJ_DIR = objs
-INC_DIR = includes
-LIBFT_DIR = libft
+LIBFT_DIR = ./libft
+LIBFT = $(LIBFT_DIR)/libft.a
 
 READLINE = -lreadline
+INCLUDES = -Iincludes -I$(LIBFT_DIR)
 
-SRCS    = \
-	$(SRC_DIR)/main.c \
-	$(SRC_DIR)/execution/executor.c \
-	$(SRC_DIR)/execution/init_env.c \
-	$(SRC_DIR)/execution/pipes.c \
-	$(SRC_DIR)/execution/redirections.c \
-	$(SRC_DIR)/parsing/parcer.c \
-	$(SRC_DIR)/execution/builtin/ft_cd.c \
-	$(SRC_DIR)/execution/builtin/ft_echo.c \
-	$(SRC_DIR)/execution/builtin/ft_env.c \
-	$(SRC_DIR)/execution/builtin/ft_exit.c \
-	$(SRC_DIR)/execution/builtin/ft_pwd.c \
-	$(SRC_DIR)/execution/utils/free.c \
-	$(SRC_DIR)/execution/utils/utils00.c \
-	$(SRC_DIR)/execution/utils/env_utils.c \
-	$(SRC_DIR)/execution/builtin/ft_export.c \
-	$(SRC_DIR)/execution/builtin/ft_unset.c
+SRCS = \
+	srcs/main.c \
+	srcs/execution/executor.c \
+	srcs/execution/init_env.c \
+	srcs/execution/pipes.c \
+	srcs/execution/redirections.c \
+	srcs/execution/signals.c \
+	srcs/execution/utils/ft_malloc.c \
+	srcs/execution/utils/builtin_utils.c \
+	srcs/execution/utils/utils00.c \
+	srcs/execution/utils/utils01.c \
+	srcs/execution/utils/env_utils.c \
+	srcs/execution/builtin/ft_cd.c \
+	srcs/execution/builtin/ft_echo.c \
+	srcs/execution/builtin/ft_env.c \
+	srcs/execution/builtin/ft_exit.c \
+	srcs/execution/builtin/ft_pwd.c \
+	srcs/execution/builtin/ft_export.c \
+	srcs/execution/builtin/ft_unset.c \
+	srcs/parcing/parcer.c \
+	srcs/parcing/parcer_utils_1.c \
+	srcs/parcing/parcer_utils_2.c \
+	srcs/parcing/parcer_utils_3.c \
+	srcs/parcing/parcer_utils_4.c \
+	srcs/parcing/parcer_utils_5.c \
+	srcs/parcing/parcer_utils_6.c \
+	srcs/parcing/heredoc.c \
+	srcs/parcing/heredoc_utils.c \
+	srcs/parcing/heredoc_utils_1.c \
+	srcs/parcing/expantion.c \
+	srcs/parcing/expantion_utils_1.c \
+	srcs/parcing/expantion_utils_2.c
 
-
-
-OBJS    = $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
-
-$(NAME): $(LIBFT_DIR)/libft.a $(OBJS)
-	$(CC) $(CFLAGS) $(OBJS) $(LIBFT_DIR)/libft.a $(READLINE) -o $(NAME)
-
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -I$(INC_DIR) -I$(LIBFT_DIR) -c $< -o $@
-
-$(LIBFT_DIR)/libft.a:
-	make -C $(LIBFT_DIR)
+OBJS = $(SRCS:.c=.o)
 
 all: $(NAME)
 
+$(NAME): $(OBJS) $(LIBFT)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $(NAME) $(OBJS) $(LIBFT) $(READLINE)
+
+%.o: %.c
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(LIBFT):
+	make -C $(LIBFT_DIR) bonus
+
 clean:
-	rm -rf $(OBJ_DIR)
+	rm -f $(OBJS)
 	make -C $(LIBFT_DIR) clean
 
 fclean: clean
@@ -55,3 +66,5 @@ fclean: clean
 re: fclean all
 
 .PHONY: all clean fclean re
+
+.SECONDARY: ${OBJS}

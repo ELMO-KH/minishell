@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ft_atoi.c                                          :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: ayouahid <marvin@42.fr>                    +#+  +:+       +#+        */
+/*   By: elkharti <elkharti@student.1337.ma>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/10/22 22:05:14 by ayouahid          #+#    #+#             */
-/*   Updated: 2024/11/14 13:20:02 by ayouahid         ###   ########.fr       */
+/*   Updated: 2025/07/12 20:56:34 by elkharti         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,40 +16,29 @@
 #include <string.h>
 #include <unistd.h>
 
-static int	fornotminette(int result, int cmpt, int cmpmoins)
-{
-	if (cmpt > 1)
-		return (0);
-	if (cmpmoins == 1)
-		return (result * -1);
-	return (result);
-}
-
 int	ft_atoi(const char *str)
 {
 	int		i;
-	int		cmpt;
-	long	result;
-	int		cmpmoins;
+	int		s;
+	long	r;
 
-	cmpmoins = 0;
-	result = 0;
-	cmpt = 0;
 	i = 0;
-	while ((str[i] >= 9 && str[i] <= 13) || (str[i] == 32 && str[i] != '\0'))
+	s = 1;
+	r = 0;
+	while ((str[i] >= 9 && str[i] <= 13) || str[i] == 32)
 		i++;
-	while (str[i] == '-' || str[i] == '+')
+	if (str[i] == '+' || str[i] == '-')
 	{
-		cmpt++;
 		if (str[i] == '-')
-			cmpmoins++;
+			s *= -1;
 		i++;
 	}
-	while (str[i] >= 48 && str[i] <= 57)
+	while (str[i] >= '0' && str[i] <= '9')
 	{
-		result = result * 10 + (str[i] - 48);
+		r = r * 10 + (str[i] - 48);
+		if (r < 0)
+			return ((-s * (s == 1)));
 		i++;
 	}
-	result = fornotminette(result, cmpt, cmpmoins);
-	return (result);
+	return (s * r);
 }

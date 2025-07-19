@@ -1,128 +1,107 @@
-#include "minishell.h"
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   env_utils.c                                        :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: elkharti <elkharti@student.1337.ma>        +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/04/15 10:00:00 by elkharti          #+#    #+#             */
+/*   Updated: 2025/07/10 09:06:29 by elkharti         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
 
-void update_env(t_env *env, const char *key, const char *new_value)
+#include "../../../includes/minishell.h"
+
+void	update_env(t_env *env, const char *key, const char *new_value)
 {
-    t_env *current = env;
+	t_env	*current;
 
-    while (current)
-    {
-        if (ft_strcmp(current->key, key) == 0)
-        {
-            free(current->value);
-            current->value = ft_strdup(new_value);
-            return;
-        }
-        current = current->next;
-    }
-}
-
-void add_env_node(t_env **env, t_env *new_node)
-{
-    t_env *tmp;
-
-    if (!*env)
-    {
-        *env = new_node;
-        return;
-    }
-
-    tmp = *env;
-    while (tmp->next)
-        tmp = tmp->next;
-    tmp->next = new_node;
-}
-
-static void	swap_env(t_env *a, t_env *b)
-{
-	char	*tmp_key;
-	char	*tmp_val;
-
-	tmp_key = a->key;
-	tmp_val = a->value;
-	a->key = b->key;
-	a->value = b->value;
-	b->key = tmp_key;
-	b->value = tmp_val;
-}
-
-static void	sort_env(t_env *env)
-{
-	t_env	*tmp;
-	int		swapped;
-
-	if (!env)
-		return ;
-	swapped = 1;
-	while (swapped)
+	current = env;
+	while (current)
 	{
-		swapped = 0;
-		tmp = env;
-		while (tmp->next)
+		if (ft_strcmp(current->key, key) == 0)
 		{
-			if (ft_strcmp(tmp->key, tmp->next->key) > 0)
-			{
-				swap_env(tmp, tmp->next);
-				swapped = 1;
-			}
-			tmp = tmp->next;
+			current->value = ft_strdup(new_value);
+			return ;
 		}
+		current = current->next;
 	}
 }
 
-void	sort_and_print_env(t_env *env)
+void	update_or_add_env(t_env **env, const char *key, const char *new_value)
 {
-	t_env	*copy;
+	t_env	*current;
+
+	current = *env;
+	while (current)
+	{
+		if (ft_strcmp(current->key, key) == 0)
+		{
+			update_env(*env, key, new_value);
+			return ;
+		}
+		current = current->next;
+	}
+	add_env_node(env, new_env_node((char *)key, (char *)new_value));
+}
+
+void	add_env_node(t_env **env, t_env *new_node)
+{
 	t_env	*tmp;
 
-	copy = NULL;
-	while (env)
+	if (!*env)
 	{
-		if (env->value)
-			add_env_node(&copy, new_env_node(env->key, env->value));
-		env = env->next;
+		*env = new_node;
+		return ;
 	}
-	sort_env(copy);
-	tmp = copy;
-	while (tmp)
-	{
-		ft_putstr_fd(tmp->key, STDOUT_FILENO);
-		ft_putchar_fd('=', STDOUT_FILENO);
-		ft_putstr_fd(tmp->value, STDOUT_FILENO);
-		ft_putchar_fd('\n', STDOUT_FILENO);
+	tmp = *env;
+	while (tmp->next)
 		tmp = tmp->next;
-	}
-	free_env(copy);
+	tmp->next = new_node;
 }
 
-int	env_size(t_env *env)
+static char	*create_env_string(t_env *env, int *success)
 {
-	int i = 0;
-	while (env)
+	char	*temp;
+	char	*result;
+
+	*success = 1;
+	if (!env->key || !env->value)
+		return (NULL);
+	temp = ft_strjoin(env->key, "=");
+	if (!temp)
 	{
-		i++;
-		env = env->next;
+		*success = 0;
+		return (NULL);
 	}
-	return i;
+	result = ft_strjoin(temp, env->value);
+	if (!result)
+		*success = 0;
+	return (result);
 }
 
 char	**env_to_array(t_env *env)
 {
-	int		i = 0;
+	int		i;
 	char	**arr;
-	char	*temp;
+	int		success;
+	char	*env_str;
 
-	arr = malloc(sizeof(char *) * (env_size(env) + 1));
+	if (!env)
+		return (NULL);
+	arr = ft_malloc(sizeof(char *) * (env_size(env) + 1), 1);
 	if (!arr)
-		return NULL;
-
+		return (NULL);
+	i = 0;
 	while (env)
 	{
-		temp = ft_strjoin(env->key, "=");
-		arr[i] = ft_strjoin(temp, env->value);
-		free(temp);
-		i++;
+		env_str = create_env_string(env, &success);
+		if (env_str && success)
+			arr[i++] = env_str;
+		else if (!success)
+			return (NULL);
 		env = env->next;
 	}
 	arr[i] = NULL;
-	return arr;
+	return (arr);
 }

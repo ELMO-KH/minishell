@@ -1,49 +1,49 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   ft_pwd.c                                           :+:      :+:    :+:   */
+/*   signals.c                                          :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: elkharti <elkharti@student.1337.ma>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/04/15 10:00:00 by elkharti          #+#    #+#             */
-/*   Updated: 2025/07/11 19:48:20 by elkharti         ###   ########.fr       */
+/*   Updated: 2025/07/07 08:59:00 by elkharti         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../../../includes/minishell.h"
+#include <minishell.h>
 
-int	ft_pwd(t_data *data)
+static void	sig_handler_parent(int sig)
 {
-	char	cwd[PATH_MAX];
-
-	(void)data;
-	if (getcwd(cwd, PATH_MAX))
-	{
-		ft_putstr_fd(cwd, STDOUT_FILENO);
-		ft_putchar_fd('\n', STDOUT_FILENO);
-		g_exit_status = SUCCESS;
-		return (SUCCESS);
-	}
-	perror("minishell: pwd");
-	g_exit_status = FAILURE;
-	return (FAILURE);
+	(void) sig;
+	write(1, "\n", 1);
+	rl_on_new_line();
+	rl_replace_line("", 0);
+	rl_redisplay();
+	g_exit_status = 130;
 }
 
-void	safe_close(int fd)
+static void	sig_handler_child(int signum)
 {
-	if (fd >= 0)
-		close(fd);
+	if (signum == SIGQUIT)
+	{
+		printf("Quit (core dumped)\n");
+		g_exit_status = 131;
+	}
+	if (signum == SIGINT)
+	{
+		printf("\n");
+		g_exit_status = 130;
+	}
 }
 
-int	env_size(t_env *env)
+void	signal_parent_handler(void)
 {
-	int	i;
+	signal (SIGQUIT, SIG_IGN);
+	signal (SIGINT, sig_handler_parent);
+}
 
-	i = 0;
-	while (env)
-	{
-		i++;
-		env = env->next;
-	}
-	return (i);
+void	signal_child_handler(void)
+{
+	signal(SIGQUIT, sig_handler_child);
+	signal(SIGINT, sig_handler_child);
 }
